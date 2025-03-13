@@ -1,5 +1,5 @@
-// server.js
 const express = require('express');
+const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const { PrismaClient } = require('@prisma/client');
@@ -9,64 +9,48 @@ const app = express();
 
 app.use(express.json());
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+// Enable CORS (Allow frontend to access backend)
+const corsOptions = {
+  origin: 'http://localhost:3000', // Allow requests from frontend
+  credentials: true, // Allow cookies & authorization headers
+};
+app.use(cors(corsOptions));
 
-// ----------------------
-// User Registration
-// ----------------------
+// Secret key for JWT (store in .env in production)
+const JWT_SECRET = 'your-secret-key';
+
+// Registration Endpoint
 app.post('/register', async (req, res) => {
   try {
     const { email, password, name } = req.body;
-
-    // Check if email already exists
-    const existingUser = await prisma.user.findUnique({ where: { email } });
-    if (existingUser) {
-      return res.status(409).json({ error: 'Email already in use' });
-    }
-
-    // Hash the password before storing
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create new user in database
     const user = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        name,
-      },
+      data: { email, password: hashedPassword, name },
     });
 
-    return res
-      .status(201)
-      .json({ message: 'User created successfully', userId: user.id });
+    return res.status(201).json({ message: 'User created', userId: user.id });
   } catch (error) {
     console.error(error);
     return res
-      .status(500)
+      .status(400)
       .json({ error: 'Registration failed', details: error.message });
   }
 });
 
-// ----------------------
-// User Login
-// ----------------------
+// Login Endpoint
 app.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    // Find user by email
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid email or password' });
-    }
 
-    // Compare hashed password with user input
-    const validPassword = await bcrypt.compare(password, user.password);
-    if (!validPassword) {
+    if (!user)
       return res.status(401).json({ error: 'Invalid email or password' });
-    }
 
-    // Generate JWT token
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid)
+      return res.status(401).json({ error: 'Invalid email or password' });
+
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, {
       expiresIn: '1h',
     });
@@ -75,33 +59,25 @@ app.post('/login', async (req, res) => {
   } catch (error) {
     console.error(error);
     return res
-      .status(500)
+      .status(400)
       .json({ error: 'Login failed', details: error.message });
   }
 });
 
-// ----------------------
-// Protected Route: Profile
-// ----------------------
+// Protected Profile Route
 app.get('/profile', async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
-    if (!authHeader) {
+    if (!authHeader)
       return res.status(401).json({ error: 'No token provided' });
-    }
 
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, JWT_SECRET);
 
-    // Retrieve user profile from database
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
-      select: { id: true, email: true, name: true },
     });
-
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
+    if (!user) return res.status(404).json({ error: 'User not found' });
 
     return res.json({ user });
   } catch (error) {
@@ -112,10 +88,8 @@ app.get('/profile', async (req, res) => {
   }
 });
 
-// ----------------------
-// Start the Server
-// ----------------------
+// Start Server
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Backend running on port ${PORT}`);
 });
