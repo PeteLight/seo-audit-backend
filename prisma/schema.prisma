@@ -1,0 +1,53 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        Int       @id @default(autoincrement())
+  email     String    @unique
+  password  String
+  name      String?
+  createdAt DateTime  @default(now())
+  reports   Report[]
+}
+
+model Report {
+  id              Int              @id @default(autoincrement())
+  url             String           // The website URL that was audited
+  overallScore    Int?             // Overall SEO score (e.g., 0-100)
+  mobileScore     Int?             // Optional: score for mobile-friendliness
+  pageSpeedScore  Int?             // Optional: score for page speed performance
+  seoDetails      Json?            // Detailed audit results stored as JSON
+  recommendations String?          // Actionable recommendations in text
+  createdAt       DateTime         @default(now())
+  userId          Int
+  user            User             @relation(fields: [userId], references: [id])
+  competitorReports CompetitorReport[]
+}
+
+model Competitor {
+  id        Int                @id @default(autoincrement())
+  name      String?            // Optional: competitor name
+  url       String             // Competitor website URL
+  createdAt DateTime           @default(now())
+  competitorReports CompetitorReport[]
+}
+
+model CompetitorReport {
+  id              Int      @id @default(autoincrement())
+  reportId        Int
+  competitorId    Int
+  competitorScore Int?     // SEO score for the competitor in this analysis
+  details         Json?    // Detailed competitor analysis results (as JSON)
+  createdAt       DateTime @default(now())
+
+  report     Report     @relation(fields: [reportId], references: [id])
+  competitor Competitor @relation(fields: [competitorId], references: [id])
+
+  @@unique([reportId, competitorId])
+}
