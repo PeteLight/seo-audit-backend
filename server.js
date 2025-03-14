@@ -1,8 +1,12 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const { PrismaClient } = require('@prisma/client');
+
+// Import API routes
+const apiRoutes = require('./routes/api');
 
 const prisma = new PrismaClient();
 const app = express();
@@ -17,7 +21,11 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // Secret key for JWT (store in .env in production)
-const JWT_SECRET = 'your-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+
+// =========================
+// User Authentication Routes
+// =========================
 
 // Registration Endpoint
 app.post('/register', async (req, res) => {
@@ -88,8 +96,20 @@ app.get('/profile', async (req, res) => {
   }
 });
 
+// =========================
+// External API Routes (SEO Audit APIs)
+// =========================
+app.use('/api', apiRoutes);
+
+// =========================
+// Default Route
+// =========================
+app.get('/', (req, res) => {
+  res.json({ message: 'SEO Audit API is running successfully.' });
+});
+
 // Start Server
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log(`Backend running on port ${PORT}`);
+  console.log(`✅ Backend running on port ${PORT}`);
 });
